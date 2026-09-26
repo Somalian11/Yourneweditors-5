@@ -327,7 +327,7 @@
      everywhere, like a lot of sites do it. ---------- */
   document.querySelectorAll('.mailto-cta').forEach(function(btn){
     btn.addEventListener('click', function(){
-      window.location.href = 'mailto:hello@yourneweditors.com?subject='
+      window.location.href = 'mailto:yourneweditors@gmail.com?subject='
         + encodeURIComponent('Enquiry from your website');
     });
   });
@@ -351,7 +351,7 @@
       message || '-'
     ].join('\n');
 
-    var mailtoUrl = 'mailto:hello@yourneweditors.com'
+    var mailtoUrl = 'mailto:yourneweditors@gmail.com'
       + '?subject=' + encodeURIComponent(subject)
       + '&body=' + encodeURIComponent(body);
 
