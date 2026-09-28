@@ -111,7 +111,6 @@
         if(src){
           video.src = src;
           video.removeAttribute('data-src');
-          video.load();
         }
         lazyIO.unobserve(video);
       });
