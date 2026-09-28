@@ -5,11 +5,13 @@
      link is reopened (especially after backgrounding the tab or coming
      back via history), which makes the page look like it "starts" a bit
      lower than the top. Unless the URL is deliberately pointing at a
-     section (a #hash), always land at the top. */
+     section (a #hash), always land at the top. This only happens once, when
+     the page opens. It must never run again later (for example when loading
+     finishes), or it would throw someone back to the top after they have
+     already started scrolling. */
   if('scrollRestoration' in history){ history.scrollRestoration = 'manual'; }
   if(!window.location.hash){
     window.scrollTo(0, 0);
-    window.addEventListener('load', function(){ window.scrollTo(0, 0); });
   }
 
   /* ---------- pricing tabs / swipeable carousel ---------- */
@@ -107,173 +109,6 @@
     revealEls.forEach(function(el){ el.classList.add('in-view'); });
   }
 
-  /* ---------- lazy-load video sources ---------- */
-  /* Videos are streamed from the media host (a Cloudflare R2 bucket), which
-     answers partial-content requests properly, so they seek, loop and play
-     on iPhones like normal video. A clip starts playing as soon as its
-     first chunk arrives and keeps downloading while you watch.
-
-     The 3 main videos are the first thing people watch, so they start
-     loading the moment the page opens and stay ready while you read. The
-     other clips wait until those 3 are ready, so they don't share the
-     connection, then load shortly before they scroll into view and are
-     released once well out of view. On data saver or a very slow signal,
-     nothing is loaded ahead of time. If the media host can't be reached,
-     the clip is downloaded whole from the copy on this site instead, so a
-     video never ends up as a black box. */
-  var VIDEO_HOST = 'https://media.yourneweditors.com/';
-  var lazyVideos = document.querySelectorAll('video.lazy-video');
-
-  var conn = navigator.connection || {};
-  var lowData = !!conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '');
-  var priority = Array.prototype.slice.call(document.querySelectorAll('.offer-reels video.lazy-video'));
-  priority.forEach(function(v){ v._priority = true; });
-  var othersReleased = lowData || !priority.length;
-
-  function startWhenReady(video){
-    if(video._visible){
-      var p = video.play();
-      if(p !== undefined) p.catch(function(){});
-    } else if(video._priority){
-      prime(video);
-    }
-  }
-
-  /* start a not-yet-visible priority clip so its first frames and some
-     buffer are ready (phones often ignore "preload"), then hold it paused */
-  function prime(video){
-    if(video._primed) return;
-    video._primed = true;
-    var stop = function(){
-      video.removeEventListener('playing', stop);
-      if(!video._visible) video.pause();
-    };
-    video.addEventListener('playing', stop);
-    var p = video.play();
-    if(p !== undefined) p.catch(function(){});
-  }
-
-  /* fallback: fetch the whole file from this site, play from memory */
-  function downloadWhole(video, path){
-    video._state = 'loading';
-    var ctl = ('AbortController' in window) ? new AbortController() : null;
-    video._ctl = ctl;
-
-    function ready(url, isBlob){
-      video._state = 'ready';
-      video._blobUrl = isBlob ? url : null;
-      video.src = url;
-      startWhenReady(video);
-    }
-
-    if(!window.fetch || !window.URL || !URL.createObjectURL){ ready(path, false); return; }
-
-    fetch(path, ctl ? { signal: ctl.signal } : undefined)
-      .then(function(r){ if(!r.ok) throw new Error('download failed'); return r.blob(); })
-      .then(function(blob){
-        if(video._state !== 'loading') return;   // released while downloading
-        ready(URL.createObjectURL(blob), true);
-      })
-      .catch(function(err){
-        if(err && err.name === 'AbortError') return;
-        if(video._state === 'loading') ready(path, false);
-      });
-  }
-
-  function streamFromHost(video, url, path){
-    video._state = 'ready';
-    video._blobUrl = null;
-    var onError = function(){
-      video.removeEventListener('error', onError);
-      video._onError = null;
-      if(video._state !== 'ready' || !video.getAttribute('src')) return;
-      // media host unreachable: fall back to this site's own copy
-      video.removeAttribute('src');
-      downloadWhole(video, path);
-    };
-    video._onError = onError;
-    video.addEventListener('error', onError);
-    video.src = url;
-    startWhenReady(video);
-  }
-
-  function loadVideo(video){
-    if(video._state === 'loading' || video._state === 'ready') return;
-    var path = video.getAttribute('data-src');
-    if(!path) return;
-    if(VIDEO_HOST && path.indexOf('videos/') === 0){
-      streamFromHost(video, VIDEO_HOST + path, path);
-    } else {
-      downloadWhole(video, path);
-    }
-  }
-
-  function unloadVideo(video){
-    if(video._state !== 'loading' && video._state !== 'ready') return;
-    if(video._state === 'loading' && video._ctl){ video._ctl.abort(); }
-    if(video._onError){ video.removeEventListener('error', video._onError); video._onError = null; }
-    video.pause();
-    video.removeAttribute('src');
-    video.load();
-    if(video._blobUrl){ URL.revokeObjectURL(video._blobUrl); video._blobUrl = null; }
-    video._primed = false;
-    video._state = 'idle';
-  }
-
-  function onScreen(video){
-    var r = video.getBoundingClientRect();
-    return r.bottom > 0 && r.top < window.innerHeight;
-  }
-
-  /* the other clips may start loading once the 3 main ones are ready */
-  function releaseOthers(){
-    if(othersReleased) return;
-    othersReleased = true;
-    lazyVideos.forEach(function(v){ if(v._inZone) loadVideo(v); });
-  }
-
-  if('IntersectionObserver' in window && lazyVideos.length){
-    /* start loading a clip a little before it scrolls into view */
-    var loadIO = new IntersectionObserver(function(entries){
-      entries.forEach(function(entry){
-        var v = entry.target;
-        v._inZone = entry.isIntersecting;
-        if(!entry.isIntersecting) return;
-        if(othersReleased || v._priority || onScreen(v)) loadVideo(v);
-      });
-    }, { rootMargin: '300px 0px 300px 0px', threshold: 0.01 });
-
-    /* and let go of a clip once it is well out of view. The 3 main videos
-       are kept while they are still ahead of you, so they are ready when
-       you get there. */
-    var unloadIO = new IntersectionObserver(function(entries){
-      entries.forEach(function(entry){
-        if(entry.isIntersecting) return;
-        var v = entry.target;
-        if(v._priority && v.getBoundingClientRect().top > 0) return;
-        unloadVideo(v);
-      });
-    }, { rootMargin: '700px 0px 700px 0px', threshold: 0 });
-
-    lazyVideos.forEach(function(video){ loadIO.observe(video); unloadIO.observe(video); });
-
-    if(!lowData && priority.length){
-      var waiting = priority.length;
-      priority.forEach(function(v){
-        var once = function(){
-          v.removeEventListener('canplay', once);
-          if(--waiting <= 0) releaseOthers();
-        };
-        v.addEventListener('canplay', once);
-        loadVideo(v);
-      });
-      setTimeout(releaseOthers, 6000);   // never hold the others back for long
-    }
-  } else {
-    // no IntersectionObserver support: just load everything immediately
-    lazyVideos.forEach(function(video){ loadVideo(video); });
-  }
-
   /* ---------- reel video autoplay ---------- */
   /* Autoplay policies differ wildly: sandboxed iframes often block .play()
      until the user has interacted. We try several strategies:
@@ -285,13 +120,11 @@
   var reelVideos = document.querySelectorAll('.video-grid video, .offer-video video, .offer-reel video, .close-video video');
   reelVideos.forEach(function(video){
     video.muted = true;
-    video.autoplay = true;
+    video.autoplay = video.hasAttribute('autoplay');
     video.playsInline = true;
     video.setAttribute('muted', '');
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
-    video.setAttribute('preload', 'auto');
-    video.load();
 
     // Toggle the is-playing class on the parent so the play indicator fades
     var parent = video.closest('.tile') || video.closest('.offer-video') || video.closest('.offer-reel') || video.closest('.close-video');
@@ -302,9 +135,15 @@
     }
   });
 
+  /* only play what is actually on screen; the rest starts when you get there */
+  function onScreen(video){
+    var r = video.getBoundingClientRect();
+    return r.bottom > 0 && r.top < window.innerHeight;
+  }
+
   function tryPlayAll(){
     reelVideos.forEach(function(video){
-      if(video.paused){
+      if(video.paused && onScreen(video)){
         var p = video.play();
         if(p !== undefined) p.catch(function(){});
       }
@@ -320,7 +159,7 @@
   var playRetryTimer = setInterval(function(){
     playRetries++;
     var stillPaused = false;
-    reelVideos.forEach(function(video){ if(video.paused) stillPaused = true; });
+    reelVideos.forEach(function(video){ if(video.paused && onScreen(video)) stillPaused = true; });
     if(!stillPaused || playRetries > 10){
       clearInterval(playRetryTimer);
       return;
@@ -333,7 +172,7 @@
   reelVideos.forEach(function(video){
     ['loadedmetadata','loadeddata','canplay','canplaythrough'].forEach(function(ev){
       video.addEventListener(ev, function(){
-        if(video.paused){ video.play().catch(function(){}); }
+        if(video.paused && onScreen(video)){ video.play().catch(function(){}); }
       }, { once: true });
     });
   });
