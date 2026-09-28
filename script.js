@@ -95,52 +95,108 @@
   }
 
   /* ---------- lazy-load video sources ---------- */
-  /* The 3 main reels and the 4 grid videos below only get their real
-     src (and therefore only start downloading) once the user has nearly
-     scrolled to them. This keeps the initial page load light — nobody
-     pays for videos they never scroll down to see — and each clip starts
-     fresh from frame one right as it comes into view instead of having
-     played through invisibly in the background. */
+  /* Videos are streamed from the media host (a Cloudflare R2 bucket), which
+     answers partial-content requests properly, so they seek, loop and play
+     on iPhones like normal video. A clip only starts loading shortly before
+     it scrolls into view and is released once well out of view, so clips
+     never pile up in memory. If the media host can't be reached, the clip is
+     downloaded whole from the copy on this site instead and played from
+     memory, so a video never ends up as a black box. */
+  var VIDEO_HOST = 'https://media.yourneweditors.com/';
   var lazyVideos = document.querySelectorAll('video.lazy-video');
+
+  function startWhenReady(video){
+    if(video._visible){
+      var p = video.play();
+      if(p !== undefined) p.catch(function(){});
+    }
+  }
+
+  /* fallback: fetch the whole file from this site, play from memory */
+  function downloadWhole(video, path){
+    video._state = 'loading';
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    video._ctl = ctl;
+
+    function ready(url, isBlob){
+      video._state = 'ready';
+      video._blobUrl = isBlob ? url : null;
+      video.src = url;
+      startWhenReady(video);
+    }
+
+    if(!window.fetch || !window.URL || !URL.createObjectURL){ ready(path, false); return; }
+
+    fetch(path, ctl ? { signal: ctl.signal } : undefined)
+      .then(function(r){ if(!r.ok) throw new Error('download failed'); return r.blob(); })
+      .then(function(blob){
+        if(video._state !== 'loading') return;   // released while downloading
+        ready(URL.createObjectURL(blob), true);
+      })
+      .catch(function(err){
+        if(err && err.name === 'AbortError') return;
+        if(video._state === 'loading') ready(path, false);
+      });
+  }
+
+  function streamFromHost(video, url, path){
+    video._state = 'ready';
+    video._blobUrl = null;
+    var onError = function(){
+      video.removeEventListener('error', onError);
+      video._onError = null;
+      if(video._state !== 'ready' || !video.getAttribute('src')) return;
+      // media host unreachable: fall back to this site's own copy
+      video.removeAttribute('src');
+      downloadWhole(video, path);
+    };
+    video._onError = onError;
+    video.addEventListener('error', onError);
+    video.src = url;
+    startWhenReady(video);
+  }
+
+  function loadVideo(video){
+    if(video._state === 'loading' || video._state === 'ready') return;
+    var path = video.getAttribute('data-src');
+    if(!path) return;
+    if(VIDEO_HOST && path.indexOf('videos/') === 0){
+      streamFromHost(video, VIDEO_HOST + path, path);
+    } else {
+      downloadWhole(video, path);
+    }
+  }
+
+  function unloadVideo(video){
+    if(video._state !== 'loading' && video._state !== 'ready') return;
+    if(video._state === 'loading' && video._ctl){ video._ctl.abort(); }
+    if(video._onError){ video.removeEventListener('error', video._onError); video._onError = null; }
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    if(video._blobUrl){ URL.revokeObjectURL(video._blobUrl); video._blobUrl = null; }
+    video._state = 'idle';
+  }
+
   if('IntersectionObserver' in window && lazyVideos.length){
-    /* load a video just before it scrolls into view */
+    /* start loading a clip a little before it scrolls into view */
     var loadIO = new IntersectionObserver(function(entries){
       entries.forEach(function(entry){
-        if(!entry.isIntersecting) return;
-        var video = entry.target;
-        var src = video.getAttribute('data-src');
-        if(src){
-          video.src = src;
-          video.removeAttribute('data-src');
-        }
+        if(entry.isIntersecting) loadVideo(entry.target);
       });
-    }, { rootMargin: '150px 0px 150px 0px', threshold: 0.01 });
+    }, { rootMargin: '300px 0px 300px 0px', threshold: 0.01 });
 
-    /* and let go of a video once it is well out of view. Without this,
-       every video passed on the way down stays downloaded and decoding,
-       which chokes phone connections and hits the limit on how many
-       videos a phone will keep active at once (later ones stay black). */
+    /* and let go of a clip once it is well out of view */
     var unloadIO = new IntersectionObserver(function(entries){
       entries.forEach(function(entry){
-        if(entry.isIntersecting) return;
-        var video = entry.target;
-        var src = video.getAttribute('src');
-        if(src && !video.hasAttribute('data-src')){
-          video.pause();
-          video.setAttribute('data-src', src);
-          video.removeAttribute('src');
-          video.load();
-        }
+        if(!entry.isIntersecting) unloadVideo(entry.target);
       });
-    }, { rootMargin: '450px 0px 450px 0px', threshold: 0 });
+    }, { rootMargin: '700px 0px 700px 0px', threshold: 0 });
 
     lazyVideos.forEach(function(video){ loadIO.observe(video); unloadIO.observe(video); });
   } else {
     // no IntersectionObserver support: just load everything immediately
-    lazyVideos.forEach(function(video){
-      var src = video.getAttribute('data-src');
-      if(src){ video.src = src; video.removeAttribute('data-src'); }
-    });
+    lazyVideos.forEach(function(video){ loadVideo(video); });
   }
 
   /* ---------- reel video autoplay ---------- */
@@ -212,6 +268,7 @@
     var vio = new IntersectionObserver(function(entries){
       entries.forEach(function(entry){
         var video = entry.target;
+        video._visible = entry.isIntersecting;
         if(entry.isIntersecting){
           if(video.paused){
             var p = video.play();
