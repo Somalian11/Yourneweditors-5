@@ -103,7 +103,8 @@
      played through invisibly in the background. */
   var lazyVideos = document.querySelectorAll('video.lazy-video');
   if('IntersectionObserver' in window && lazyVideos.length){
-    var lazyIO = new IntersectionObserver(function(entries){
+    /* load a video just before it scrolls into view */
+    var loadIO = new IntersectionObserver(function(entries){
       entries.forEach(function(entry){
         if(!entry.isIntersecting) return;
         var video = entry.target;
@@ -112,10 +113,28 @@
           video.src = src;
           video.removeAttribute('data-src');
         }
-        lazyIO.unobserve(video);
       });
     }, { rootMargin: '150px 0px 150px 0px', threshold: 0.01 });
-    lazyVideos.forEach(function(video){ lazyIO.observe(video); });
+
+    /* and let go of a video once it is well out of view. Without this,
+       every video passed on the way down stays downloaded and decoding,
+       which chokes phone connections and hits the limit on how many
+       videos a phone will keep active at once (later ones stay black). */
+    var unloadIO = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting) return;
+        var video = entry.target;
+        var src = video.getAttribute('src');
+        if(src && !video.hasAttribute('data-src')){
+          video.pause();
+          video.setAttribute('data-src', src);
+          video.removeAttribute('src');
+          video.load();
+        }
+      });
+    }, { rootMargin: '450px 0px 450px 0px', threshold: 0 });
+
+    lazyVideos.forEach(function(video){ loadIO.observe(video); unloadIO.observe(video); });
   } else {
     // no IntersectionObserver support: just load everything immediately
     lazyVideos.forEach(function(video){
