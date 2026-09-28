@@ -110,19 +110,47 @@
   /* ---------- lazy-load video sources ---------- */
   /* Videos are streamed from the media host (a Cloudflare R2 bucket), which
      answers partial-content requests properly, so they seek, loop and play
-     on iPhones like normal video. A clip only starts loading shortly before
-     it scrolls into view and is released once well out of view, so clips
-     never pile up in memory. If the media host can't be reached, the clip is
-     downloaded whole from the copy on this site instead and played from
-     memory, so a video never ends up as a black box. */
+     on iPhones like normal video. A clip starts playing as soon as its
+     first chunk arrives and keeps downloading while you watch.
+
+     The 3 main videos are the first thing people watch, so they start
+     loading the moment the page opens and stay ready while you read. The
+     other clips wait until those 3 are ready, so they don't share the
+     connection, then load shortly before they scroll into view and are
+     released once well out of view. On data saver or a very slow signal,
+     nothing is loaded ahead of time. If the media host can't be reached,
+     the clip is downloaded whole from the copy on this site instead, so a
+     video never ends up as a black box. */
   var VIDEO_HOST = 'https://media.yourneweditors.com/';
   var lazyVideos = document.querySelectorAll('video.lazy-video');
+
+  var conn = navigator.connection || {};
+  var lowData = !!conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '');
+  var priority = Array.prototype.slice.call(document.querySelectorAll('.offer-reels video.lazy-video'));
+  priority.forEach(function(v){ v._priority = true; });
+  var othersReleased = lowData || !priority.length;
 
   function startWhenReady(video){
     if(video._visible){
       var p = video.play();
       if(p !== undefined) p.catch(function(){});
+    } else if(video._priority){
+      prime(video);
     }
+  }
+
+  /* start a not-yet-visible priority clip so its first frames and some
+     buffer are ready (phones often ignore "preload"), then hold it paused */
+  function prime(video){
+    if(video._primed) return;
+    video._primed = true;
+    var stop = function(){
+      video.removeEventListener('playing', stop);
+      if(!video._visible) video.pause();
+    };
+    video.addEventListener('playing', stop);
+    var p = video.play();
+    if(p !== undefined) p.catch(function(){});
   }
 
   /* fallback: fetch the whole file from this site, play from memory */
@@ -188,25 +216,59 @@
     video.removeAttribute('src');
     video.load();
     if(video._blobUrl){ URL.revokeObjectURL(video._blobUrl); video._blobUrl = null; }
+    video._primed = false;
     video._state = 'idle';
+  }
+
+  function onScreen(video){
+    var r = video.getBoundingClientRect();
+    return r.bottom > 0 && r.top < window.innerHeight;
+  }
+
+  /* the other clips may start loading once the 3 main ones are ready */
+  function releaseOthers(){
+    if(othersReleased) return;
+    othersReleased = true;
+    lazyVideos.forEach(function(v){ if(v._inZone) loadVideo(v); });
   }
 
   if('IntersectionObserver' in window && lazyVideos.length){
     /* start loading a clip a little before it scrolls into view */
     var loadIO = new IntersectionObserver(function(entries){
       entries.forEach(function(entry){
-        if(entry.isIntersecting) loadVideo(entry.target);
+        var v = entry.target;
+        v._inZone = entry.isIntersecting;
+        if(!entry.isIntersecting) return;
+        if(othersReleased || v._priority || onScreen(v)) loadVideo(v);
       });
     }, { rootMargin: '300px 0px 300px 0px', threshold: 0.01 });
 
-    /* and let go of a clip once it is well out of view */
+    /* and let go of a clip once it is well out of view. The 3 main videos
+       are kept while they are still ahead of you, so they are ready when
+       you get there. */
     var unloadIO = new IntersectionObserver(function(entries){
       entries.forEach(function(entry){
-        if(!entry.isIntersecting) unloadVideo(entry.target);
+        if(entry.isIntersecting) return;
+        var v = entry.target;
+        if(v._priority && v.getBoundingClientRect().top > 0) return;
+        unloadVideo(v);
       });
     }, { rootMargin: '700px 0px 700px 0px', threshold: 0 });
 
     lazyVideos.forEach(function(video){ loadIO.observe(video); unloadIO.observe(video); });
+
+    if(!lowData && priority.length){
+      var waiting = priority.length;
+      priority.forEach(function(v){
+        var once = function(){
+          v.removeEventListener('canplay', once);
+          if(--waiting <= 0) releaseOthers();
+        };
+        v.addEventListener('canplay', once);
+        loadVideo(v);
+      });
+      setTimeout(releaseOthers, 6000);   // never hold the others back for long
+    }
   } else {
     // no IntersectionObserver support: just load everything immediately
     lazyVideos.forEach(function(video){ loadVideo(video); });
