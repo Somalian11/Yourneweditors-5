@@ -89,7 +89,20 @@
         }
       });
     }, { threshold:0.15 });
-    revealEls.forEach(function(el){ io.observe(el); });
+    /* the video blocks are very tall on a phone, so waiting for 15% of them
+       to be on screen left a big blank black area while scrolling toward
+       them. They fade in as soon as they are close instead. */
+    var ioEarly = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          entry.target.classList.add('in-view');
+          ioEarly.unobserve(entry.target);
+        }
+      });
+    }, { threshold:0, rootMargin:'0px 0px 40% 0px' });
+    revealEls.forEach(function(el){
+      if(el.classList.contains('reveal-early')){ ioEarly.observe(el); } else { io.observe(el); }
+    });
   } else {
     revealEls.forEach(function(el){ el.classList.add('in-view'); });
   }
