@@ -81,9 +81,10 @@
   }
   .brand-name{
     font-size:15px; letter-spacing:.02em; line-height:1.15;
+    display:flex; flex-direction:column; gap:2px;
   }
-  .brand-name strong{ display:block; font-weight:600; }
-  .brand-name span{ display:block; color:var(--gray); font-size:12px; }
+  .brand-name strong{ font-weight:600; }
+  .brand-name span{ color:var(--gray); font-size:12px; }
 
   .nav-links{
     display:flex; align-items:center; gap:34px;
