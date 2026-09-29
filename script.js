@@ -109,6 +109,49 @@
     revealEls.forEach(function(el){ el.classList.add('in-view'); });
   }
 
+  /* ---------- start the other 5 videos without delaying page load ---------- */
+  /* The 3 main videos load straight away, declared in the HTML, so they are
+     ready as fast as possible. But a browser's own "page is loading"
+     indicator waits for every video declared that way, so 7 of them kept it
+     spinning far longer than the page actually took to become usable. The
+     other 5 (the 4 grid videos and the closing one) start from a script
+     instead, right away but not declared in the HTML, so the browser
+     considers the page loaded immediately while these still fetch in the
+     background exactly as before. */
+  function startVideo(video){
+    var src = video.getAttribute('data-src');
+    if(!src) return;
+    var fallback = video.getAttribute('data-fallback');
+    if(fallback){
+      video.addEventListener('error', function once(){
+        video.removeEventListener('error', once);
+        if(video.getAttribute('src') === src){ video.src = fallback; }
+      });
+    }
+    video.src = src;
+    video.removeAttribute('data-src');
+    video.setAttribute('preload', 'auto');
+    video.load();   // start the real download now; setting src alone with
+                     // preload="none" does not, it waits until this video
+                     // happens to scroll into view
+  }
+
+  /* the 3 main videos start right away, same as before. The other 5 (the
+     4 grid videos and the closing one) wait until the page has actually
+     finished loading first. A browser's own "page is loading" indicator
+     waits for every video that is genuinely downloading, so having all 8
+     start at once kept it spinning for several seconds after the page was
+     already fully usable. Waiting for "load" first means visitors see that
+     indicator finish quickly, and these 5 then carry on loading in the
+     background exactly as before, just a moment later. */
+  document.querySelectorAll('.offer-reel video[data-src]').forEach(startVideo);
+  var deferredVideos = document.querySelectorAll('.tile-reel video[data-src], .close-video video[data-src]');
+  if(document.readyState === 'complete'){
+    deferredVideos.forEach(startVideo);
+  } else {
+    window.addEventListener('load', function(){ deferredVideos.forEach(startVideo); });
+  }
+
   /* ---------- reel video autoplay ---------- */
   /* Autoplay policies differ wildly: sandboxed iframes often block .play()
      until the user has interacted. We try several strategies:
