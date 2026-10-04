@@ -238,12 +238,19 @@
     return r.bottom > 0 && r.top < window.innerHeight;
   }
 
+  /* every play() goes through here so the last answer is remembered
+     (shown by the ?debug=video readout at the bottom of this section) */
+  function attemptPlay(video){
+    var p = video.play();
+    if(p !== undefined){
+      p.then(function(){ video._playResult = 'ok'; },
+             function(e){ video._playResult = 'refused: ' + ((e && e.name) || e); });
+    }
+  }
+
   function tryPlayAll(){
     reelVideos.forEach(function(video){
-      if(video.paused && onScreen(video)){
-        var p = video.play();
-        if(p !== undefined) p.catch(function(){});
-      }
+      if(video.paused && onScreen(video)) attemptPlay(video);
     });
   }
 
@@ -267,7 +274,7 @@
   reelVideos.forEach(function(video){
     ['loadedmetadata','loadeddata','canplay','canplaythrough'].forEach(function(ev){
       video.addEventListener(ev, function(){
-        if(video.paused && onScreen(video)){ video.play().catch(function(){}); }
+        if(video.paused && onScreen(video)) attemptPlay(video);
       });
     });
   });
@@ -279,10 +286,7 @@
         var video = entry.target;
         video._visible = entry.isIntersecting;
         if(entry.isIntersecting){
-          if(video.paused){
-            var p = video.play();
-            if(p !== undefined) p.catch(function(){});
-          }
+          if(video.paused) attemptPlay(video);
         } else {
           video.pause();
         }
@@ -320,9 +324,50 @@
   // 5) tap the video to play if all else failed
   reelVideos.forEach(function(video){
     video.addEventListener('click', function(){
-      if(video.paused){ video.play().catch(function(){}); }
+      if(video.paused) attemptPlay(video);
     });
   });
+
+  /* ---------- video diagnostics (only when the address ends in ?debug=video) ---------- */
+  /* Nothing is added to the page for normal visitors. Opening
+     yourneweditors.com/?debug=video on a phone shows a small box listing,
+     for each video: where it is loading from, whether it is paused, any
+     error the browser reported, and the answer to the last play() request
+     (e.g. "refused: NotAllowedError" = the phone is blocking autoplay). */
+  if(/[?&]debug=video(&|$)/.test(location.search)){
+    var dbg = document.createElement('div');
+    dbg.style.cssText = 'position:fixed;left:6px;right:6px;bottom:6px;z-index:2147483000;max-height:48vh;overflow:auto;background:rgba(0,0,0,.9);color:#9fffa8;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;padding:8px;border:1px solid #2a2;white-space:pre-wrap;word-break:break-all';
+    document.body.appendChild(dbg);
+    var RS = ['nothing','metadata','current frame','some data','enough to play'];
+    var NS = ['empty','idle','loading','no source'];
+    function dbgRender(){
+      var c = navigator.connection || {};
+      var lines = [
+        'script: autoplay-v2',
+        'screen ' + innerWidth + 'x' + innerHeight + (document.hidden ? ' (tab hidden)' : ''),
+        'saveData: ' + (c.saveData === undefined ? 'n/a' : c.saveData) + ' | net: ' + (c.effectiveType || 'n/a'),
+        'reduced-motion: ' + matchMedia('(prefers-reduced-motion: reduce)').matches,
+        'UA: ' + navigator.userAgent.slice(0, 110),
+        ''
+      ];
+      reelVideos.forEach(function(v, i){
+        var r = v.closest('.offer-reel');
+        var label = r && r.querySelector('.name') ? r.querySelector('.name').textContent : (v.closest('.close-video') ? 'closing video' : 'grid video ' + i);
+        var src = v.currentSrc || v.getAttribute('src') || '(not started loading)';
+        var where = !v.currentSrc && !v.getAttribute('src') ? '' : (src.indexOf(location.origin) === 0 ? ' [FALLBACK: site copy]' : ' [R2/CDN]');
+        var b = v.buffered && v.buffered.length ? v.buffered.end(v.buffered.length - 1).toFixed(1) + 's' : '0s';
+        lines.push(label + ': ' + (v.paused ? 'PAUSED' : 'playing') + ' t=' + v.currentTime.toFixed(1)
+          + ' | ' + RS[v.readyState] + ' / ' + NS[v.networkState] + ' | buffered ' + b
+          + ' | ' + (v.videoWidth ? v.videoWidth + 'x' + v.videoHeight : 'no video yet')
+          + (v.error ? ' | ERROR code ' + v.error.code + (v.error.message ? ' (' + v.error.message + ')' : '') : '')
+          + ' | last play(): ' + (v._playResult || 'not asked yet')
+          + ' |' + where + ' ' + src.replace(location.origin, '').slice(-60));
+      });
+      dbg.textContent = lines.join('\n');
+    }
+    dbgRender();
+    setInterval(dbgRender, 500);
+  }
 
   /* ---------- carousel scroll hint ---------- */
   document.querySelectorAll('.carousel-strip-wrap').forEach(function(wrap){
