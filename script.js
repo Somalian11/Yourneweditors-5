@@ -1,5 +1,50 @@
 (function(){
 
+  /* ---------- clients strip: moves only as the page scrolls ---------- */
+  /* No auto-play. How far the strip has travelled through the viewport
+     (0 as it enters at the bottom, 1 as it leaves at the top) is mapped
+     onto how far the list has slid sideways, so scrolling down walks
+     you through every name and scrolling back up walks you back. */
+  (function(){
+    var box = document.querySelector('.marquee');
+    var track = document.getElementById('clientsMarqueeTrack');
+    if(!box || !track) return;
+    var ticking = false;
+
+    function update(){
+      ticking = false;
+      var bandEl = document.getElementById('clientsBand');
+      if(bandEl && bandEl.classList.contains('is-open')){ track.style.transform = ''; return; }
+      var rect = box.getBoundingClientRect();
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      var progress = (vh - rect.top) / (vh + rect.height);
+      progress = Math.max(0, Math.min(1, progress));
+      var overflow = Math.max(0, track.scrollWidth - box.clientWidth);
+      track.style.transform = 'translate3d(' + (-progress * overflow) + 'px,0,0)';
+    }
+    function onScroll(){
+      if(!ticking){ ticking = true; requestAnimationFrame(update); }
+    }
+
+    window.addEventListener('scroll', onScroll, {passive:true});
+    window.addEventListener('resize', onScroll);
+    window.addEventListener('load', update);
+    update();
+  })();
+
+  /* ---------- "Edited for": the arrow under the bar makes it taller ---------- */
+  (function(){
+    var band = document.getElementById('clientsBand');
+    var btn = document.querySelector('.clients-arrow');
+    if(!band || !btn) return;
+    btn.addEventListener('click', function(){
+      var open = band.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      // let the sideways-scroll code switch itself off/on
+      window.dispatchEvent(new Event('scroll'));
+    });
+  })();
+
   /* ---------- force page to open at the very top ---------- */
   /* Mobile browsers sometimes restore the last scroll position when a
      link is reopened (especially after backgrounding the tab or coming
@@ -151,6 +196,15 @@
   } else {
     window.addEventListener('load', function(){ deferredVideos.forEach(startVideo); });
   }
+
+  /* ---------- team bio read more/less ---------- */
+  document.querySelectorAll('.team-bio-toggle').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var wrap = btn.closest('.team-bio-wrap');
+      var open = wrap.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
 
   /* ---------- reel video autoplay ---------- */
   /* Autoplay policies differ wildly: sandboxed iframes often block .play()
@@ -326,6 +380,9 @@
   }
 
   /* ---------- modal ---------- */
+  /* Nothing on the site opens this anymore (every button is a mailto-cta
+     now). Guarded so a page without the modal's HTML doesn't throw and
+     break everything below. */
   var overlay = document.getElementById('modalOverlay');
   var openBtns = document.querySelectorAll('.open-modal');
   var closeBtn = document.getElementById('modalClose');
@@ -347,12 +404,14 @@
     if(lastFocused) lastFocused.focus();
   }
 
-  openBtns.forEach(function(btn){ btn.addEventListener('click', openModal); });
-  closeBtn.addEventListener('click', closeModal);
-  overlay.addEventListener('click', function(e){ if(e.target === overlay) closeModal(); });
-  document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
-  });
+  if(overlay && closeBtn && leadForm){
+    openBtns.forEach(function(btn){ btn.addEventListener('click', openModal); });
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', function(e){ if(e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+  }
 
   /* ---------- "Get your new editors" buttons: skip the modal, just pop
      open the visitor's email app straight to our inbox. Simple and works
@@ -364,7 +423,7 @@
     });
   });
 
-  leadForm.addEventListener('submit', function(e){
+  if(leadForm) leadForm.addEventListener('submit', function(e){
     e.preventDefault();
     var name = leadForm.name.value.trim();
     var venue = leadForm.venue.value.trim();

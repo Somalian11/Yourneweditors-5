@@ -113,10 +113,16 @@
 
   .nav .btn{ padding:11px 18px; font-size:13px; }
 
+  /* original footprint (no circle, doesn't make the bar taller); lines
+     are 2px instead of 1px so they stay visible on phone screens, and an
+     invisible extended hit area keeps it easy to tap */
   .nav-toggle{
-    display:none; flex-direction:column; gap:5px; width:28px;
+    display:none; flex-direction:column; justify-content:space-between; align-items:stretch;
+    width:28px; height:16px; flex-shrink:0; position:relative;
+    -webkit-appearance:none; appearance:none;
   }
-  .nav-toggle span{ height:1px; background:var(--white); display:block; }
+  .nav-toggle::before{ content:''; position:absolute; inset:-14px -10px; }
+  .nav-toggle span{ height:2px; background:#fff; display:block; flex-shrink:0; }
 
   @media (max-width:900px){
     .nav-links{
@@ -138,7 +144,7 @@
      between them, reading visually like a slash "/". */
   .hero{
     position:relative;
-    padding:clamp(110px, 14vh, 160px) var(--edge) clamp(36px, 5vh, 64px);
+    padding:clamp(130px, 18vh, 190px) var(--edge) clamp(70px, 10vh, 110px);
     min-height:auto;
     display:flex; flex-direction:column;
     overflow:hidden;
@@ -165,16 +171,30 @@
 
   .hero-main{
     display:grid; grid-template-columns:1fr auto; gap:clamp(30px, 5vw, 80px);
-    align-items:center; flex:1;
+    align-items:flex-start; flex:1;
   }
-  .hero-left{ min-width:0; }
+  .hero-left{ min-width:0; width:100%; padding-top:clamp(10px, 3vh, 36px); }
+
+  /* big headline on the left, a short supporting line on the right,
+     sitting together in one row — same pattern as the reference site */
+  .hero-intro{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    gap:clamp(24px, 4vw, 64px);
+  }
+  .hero-sub{
+    max-width:34ch; font-size:clamp(15px, 1.25vw, 18px); line-height:1.55;
+    color:var(--white); margin:0 6% .3em 0; text-align:left; flex-shrink:0;
+  }
 
   .hero-headline{
     font-family:var(--font-display); font-weight:400; text-transform:uppercase;
-    font-size:clamp(56px, 12vw, 180px); line-height:.88; letter-spacing:0;
+    font-size:clamp(56px, 11.5vw, 180px); line-height:.88; letter-spacing:0;
     margin:0; position:relative;
   }
-  .hero-headline .line{ overflow:hidden; }
+  /* much smaller now that it shares the hero with a playing video, so the
+     video is the thing that actually catches the eye first */
+  .hero-headline--small{ font-size:clamp(32px, 4.2vw, 64px); }
+  .hero-headline .line{ overflow:hidden; display:block; }
   .hero-headline .line span{
     display:block; transform:translateY(110%);
     animation:riseUp 1s var(--ease) forwards;
@@ -205,10 +225,85 @@
      leaning like italic slashes, treated like film stills. */
   .hero-photos{
     display:flex; gap:clamp(6px, 1vw, 16px);
-    padding-right:clamp(12px, 2vw, 28px);
+    justify-content:center;
     opacity:0; transform:translateY(14px);
     animation:fadeUp .9s var(--ease) forwards; animation-delay:.6s;
     position:relative;
+  }
+  #about .hero-photos{ margin-bottom:clamp(40px, 6vw, 64px); }
+
+  /* title -> one thin line -> two cards -> band, all on the same
+     spacing step so the section reads as one rhythm */
+  #about .section-head{ margin-bottom:0; padding-bottom:clamp(26px, 3vw, 40px); }
+  #about .section-title{ max-width:none; }
+  .team-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:clamp(14px, 1.6vw, 24px);
+    align-items:start;
+    padding-top:clamp(26px, 3vw, 40px);
+    border-top:1px solid rgba(255,255,255,.14);
+  }
+  /* each person is one bordered card: photo on the left, and a full-width
+     "Meet ..." row with a circled arrow on the right, so the space beside
+     the photo is anchored instead of floating empty */
+  .team-member{
+    display:flex; flex-direction:row; align-items:center;
+    gap:clamp(20px, 2.6vw, 36px);
+    padding:clamp(18px, 2vw, 30px);
+    border:1px solid rgba(255,255,255,.14);
+    background:#050505;
+  }
+  #about .team-member .hero-photo{ margin:0; flex-shrink:0; }
+  #about .hero-photo-frame{ width:clamp(165px, 17vw, 300px); }
+  .team-bio-wrap{ flex:1; min-width:0; }
+  /* closed by default — just the "Meet Vilte" / "Meet Ramses" trigger —
+     rather than a preview of the text itself */
+  .team-bio-toggle{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    width:100%; text-align:left;
+    font-family:var(--font-display); text-transform:uppercase;
+    font-size:clamp(20px, 2vw, 32px); font-weight:400; line-height:1.05; color:var(--white);
+    background:none; border:none; padding:0; cursor:pointer;
+  }
+  .team-bio-toggle-arrow{
+    width:40px; height:40px; flex-shrink:0; padding:12px;
+    border:1px solid rgba(255,255,255,.4); border-radius:50%;
+    transform:rotate(0deg); transition:transform .3s var(--ease), background-color .3s var(--ease), border-color .3s var(--ease);
+  }
+  .team-bio-toggle:hover .team-bio-toggle-arrow{ border-color:var(--white); background:rgba(255,255,255,.08); }
+  .team-bio-wrap.is-open .team-bio-toggle-arrow{ transform:rotate(180deg); }
+  .team-bio{
+    display:none; margin:clamp(16px, 1.6vw, 22px) 0 0;
+    color:var(--white); font-style:normal;
+  }
+  .bio-fact + .bio-fact{ margin-top:clamp(14px, 1.4vw, 18px); }
+  /* red label with a short red dash in front, the one splash of brand
+     colour in the card */
+  .bio-fact dt{
+    display:flex; align-items:center; gap:9px; margin-bottom:5px;
+    font-size:11px; font-weight:600; letter-spacing:.12em; text-transform:uppercase;
+    color:#ff3b3b;
+  }
+  .bio-fact dt::before{ content:''; width:16px; height:1px; background:#ff3b3b; flex-shrink:0; }
+  .bio-fact dd{ font-size:clamp(14px, 1.1vw, 15.5px); line-height:1.55; color:var(--white); }
+  /* the "Unofficial title" line leads, so it gets a little more presence */
+  .bio-fact--title dd{ font-size:clamp(16px, 1.35vw, 19px); line-height:1.4; }
+  .bio-fact dd em{ font-style:italic; }
+  .team-bio-wrap.is-open .team-bio{ display:block; }
+  /* desktop: once a card is open its text column is taller than the photo,
+     so line the photo up with the top of it ("Meet ..." row) */
+  @media (min-width:801px){
+    .team-member:has(.team-bio-wrap.is-open) .hero-photo{ align-self:flex-start; }
+  }
+
+  @media (max-width:800px){
+    /* Vilte and Ramses stacked, one card under the other */
+    .team-grid{ grid-template-columns:1fr; gap:16px; }
+    .team-member{ flex-direction:column; align-items:stretch; text-align:left; gap:20px; }
+    .team-member .hero-photo{ align-self:center; }
+    .team-bio-toggle{ font-size:clamp(22px, 6vw, 28px); }
+  }
+  @media (max-width:560px){
+    #about .hero-photo-frame{ width:clamp(200px, 58vw, 280px); }
   }
   .hero-photo{
     display:flex; flex-direction:column;
@@ -319,16 +414,16 @@
 
   .hero-photo-social{
     position:absolute; left:8%; bottom:16px; z-index:2;
-    display:inline-flex; align-items:center; gap:5px;
-    padding:6px 10px; max-width:64%;
-    background:rgba(0,0,0,.55); backdrop-filter:blur(3px);
-    border:1px solid rgba(255,255,255,.22);
-    font-size:11px; font-weight:500; color:var(--white);
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 16px; max-width:78%;
+    background:rgba(0,0,0,.72); backdrop-filter:blur(3px);
+    border:1.5px solid rgba(255,59,59,.6);
+    font-size:14px; font-weight:600; color:var(--white);
     text-decoration:none;
-    transition:background-color .3s var(--ease);
+    transition:background-color .3s var(--ease), border-color .3s var(--ease), transform .2s var(--ease);
   }
-  .hero-photo-social:hover{ background:rgba(0,0,0,.8); }
-  .hero-photo-social svg{ width:13px; height:13px; flex-shrink:0; }
+  .hero-photo-social:hover{ background:rgba(0,0,0,.88); border-color:rgba(255,59,59,.95); transform:scale(1.03); }
+  .hero-photo-social svg{ width:18px; height:18px; flex-shrink:0; }
   .hero-photo-social span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
   .hero-photo-label{ display:none; }
@@ -337,28 +432,82 @@
 
   .hero-meta{ margin-top:0; padding:0; }
 
-  /* stats: full-weight section on its own, not a squeezed hero afterthought */
-  .stats{
-    display:flex; justify-content:center; flex-wrap:wrap;
-    padding:clamp(32px, 4.5vw, 52px) 0;
-    margin:clamp(24px, 3vw, 40px) auto 0;
-    border-top:1px solid rgba(255,255,255,.14);
-    border-bottom:1px solid rgba(255,255,255,.14);
-    text-align:center;
-    opacity:0; animation:fadeUp .8s var(--ease) forwards; animation-delay:1.45s;
+  /* closing part of the About section: real, specific detail laid out
+     as a clean label-plus-prose editorial split, rather than oversized
+     stat numbers — gives the section real content and a bit of
+     typographic variety without just making things bigger */
+  /* "Edited for": one bordered band with a solid white tab on the left
+     (same white-block-black-text treatment as the other highlighted
+     elements), names in the display face, brand-red dots between them.
+     The list itself only slides as the page scrolls (see script.js). */
+  .about-closing{
+    margin-top:clamp(20px, 2.4vw, 32px);
+    margin-bottom:clamp(8px, 1.5vw, 20px);
   }
-  .stat{
-    padding:0 clamp(36px, 5vw, 74px);
-    border-left:1px solid rgba(255,255,255,.14);
+  .clients-band{
+    display:flex; align-items:stretch;
+    border:1px solid rgba(255,255,255,.22);
   }
-  .stat:first-child{ border-left:none; padding-left:0; }
-  .stat-num{
-    font-family:var(--font-display); font-size:clamp(42px, 5.4vw, 68px);
-    line-height:1;
+  .clients-band-label{
+    flex-shrink:0; display:flex; align-items:center;
+    background:var(--white); color:var(--black);
+    font-family:var(--font-display); text-transform:uppercase; white-space:nowrap;
+    font-size:clamp(15px, 1.4vw, 20px); letter-spacing:.05em;
+    padding:0 clamp(18px, 2.2vw, 32px);
   }
-  .stat-label{
-    font-size:15px; color:var(--gray); margin:10px auto 0; line-height:1.4;
-    max-width:24ch;
+  /* the foldout control: a plain white chevron centred under the whole
+     bar, no circle or border */
+  .clients-arrow{
+    display:flex; align-items:center; justify-content:center;
+    width:64px; height:38px; margin:4px auto 0;
+    color:var(--white); opacity:.85; transition:opacity .3s var(--ease);
+  }
+  .clients-arrow:hover{ opacity:1; }
+  .clients-arrow svg{ width:20px; height:20px; transition:transform .3s var(--ease); }
+  .clients-arrow[aria-expanded="true"] svg{ transform:rotate(180deg); }
+  .marquee{
+    flex:1; min-width:0; overflow:hidden;
+    display:flex; align-items:center;
+    padding:clamp(20px, 2.2vw, 30px) 0;
+    -webkit-mask-image:linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+    mask-image:linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  }
+  .marquee-track{
+    --gap:clamp(22px, 2.4vw, 36px);
+    display:flex; align-items:center; width:max-content;
+    will-change:transform;
+  }
+  .marquee-track span{
+    display:inline-flex; align-items:center; white-space:nowrap;
+    font-family:var(--font-display); text-transform:uppercase; color:var(--white);
+    font-size:clamp(16px, 1.5vw, 22px); letter-spacing:.03em; line-height:1;
+    padding-left:var(--gap);
+  }
+  .marquee-track span::after{
+    content:''; flex-shrink:0; width:5px; height:5px; border-radius:50%;
+    background:#ff3b3b; margin-left:var(--gap);
+  }
+  .marquee-track span:last-child::after{ display:none; }
+
+  /* OPEN: the same bar just gets longer — every name wraps onto as many
+     rows as it needs, the sideways scroll effect switches off, and the
+     white tab stays on the left. Names start flush at the left of each
+     row; one gap between names with the red dot centred in it, so every
+     name is followed by a dot except the very last one. */
+  .clients-band.is-open .marquee{
+    -webkit-mask-image:none; mask-image:none;
+    overflow:visible;
+    align-items:flex-start;
+    margin:0 clamp(18px, 2.4vw, 32px);
+  }
+  .clients-band.is-open .marquee-track{
+    width:calc(100% + var(--gap)); flex-wrap:wrap; row-gap:clamp(14px, 1.6vw, 20px);
+    transform:none !important;
+  }
+  .clients-band.is-open .marquee-track span{ position:relative; padding-left:0; padding-right:var(--gap); }
+  .clients-band.is-open .marquee-track span::after{
+    position:absolute; margin:0; top:50%; transform:translateY(-50%);
+    right:calc(var(--gap) / 2 - 2.5px);
   }
 
   @media (max-width:1100px){
@@ -367,13 +516,17 @@
   }
 
   @media (max-width:900px){
-    .hero{ min-height:auto; padding-top:clamp(110px, 14vh, 150px); padding-bottom:40px; }
-    .hero-main{ grid-template-columns:1fr; gap:36px; align-items:flex-start; }
+    .hero{ min-height:auto; padding-top:clamp(90px, 11vh, 130px); padding-bottom:32px; }
+    .hero-main{ grid-template-columns:1fr; gap:20px; align-items:flex-start; }
+    .hero-headline{ font-size:clamp(64px, 14vw, 125px); }
+    .hero-headline--small{ font-size:clamp(30px, 8vw, 44px); }
+    .hero-intro{ flex-direction:column; align-items:flex-start; gap:16px; }
+    .hero-sub{ display:none; }
+    .clients-band.is-open{ flex-direction:column; }
+    .clients-band.is-open .clients-band-label{ justify-content:center; padding:14px 20px; }
+    .clients-band.is-open .marquee-track span{ font-size:clamp(16px, 4.8vw, 20px); }
     .hero-photos{ padding-right:0; justify-content:center; width:100%; }
     .hero-photo-frame{ width:clamp(180px, 38vw, 300px); }
-    .stats{ flex-direction:column; row-gap:26px; padding:clamp(28px, 7vw, 40px) 0; }
-    .stat{ border-left:none; padding-left:0; padding-right:0; border-top:1px solid rgba(255,255,255,.14); padding-top:26px; }
-    .stat:first-child{ border-top:none; padding-top:0; }
   }
 
   @media (max-width:560px){
@@ -383,9 +536,10 @@
     .hero-photo:nth-child(1){ margin-top:0; }
     .hero-photo-frame{ width:clamp(120px, 40vw, 168px); }
     .hero-photo-social{
-      max-width:78%; font-size:9.5px; padding:5px 8px; gap:4px;
+      max-width:82%; font-size:11.5px; padding:7px 11px; gap:5px;
+      border-width:1.5px;
     }
-    .hero-photo-social svg{ width:11px; height:11px; }
+    .hero-photo-social svg{ width:14px; height:14px; }
     .hero-photo-social span{
       white-space:normal; overflow:visible; text-overflow:clip; line-height:1.25;
     }
@@ -402,7 +556,9 @@
     font-family:var(--font-display); text-transform:uppercase;
     font-size:clamp(34px, 5.4vw, 68px); line-height:.98; max-width:14ch;
   }
-  #pricing .section-title{ font-size:clamp(30px, 4vw, 48px); }
+  @media (max-width:900px){
+    #about .section-title{ font-size:clamp(42px, 10.5vw, 60px); }
+  }
   .section-note{
     font-size:17px; color:var(--gray); max-width:56ch; line-height:1.55;
   }
@@ -432,12 +588,9 @@
     display:flex; flex-direction:column;
     max-width:420px; width:100%; margin:0 auto;
   }
-  /* desktop only: visually put GEM. in the middle slot without changing
-     the underlying DOM order (so mobile, which just stacks in document
-     order, keeps GEM first like before) */
-  .offer-reel:nth-child(1){ order:2; }
-  .offer-reel:nth-child(2){ order:1; }
-  .offer-reel:nth-child(3){ order:3; }
+  /* the GEM. video sits right beside the headline in the hero, smaller
+     than the 2 reels further down so it doesn't dwarf the headline */
+
   /* everything below the 3 videos — heading, subtitle and the 4-step list —
      grouped as one cohesive block */
   .offer-how{
@@ -479,9 +632,11 @@
   @media (max-width:800px){
     .offer-reels{ grid-template-columns:1fr; gap:20px; max-width:360px; margin-left:auto; margin-right:auto; }
     .offer-reel{ max-width:360px; }
-    .offer-reel:nth-child(1),
-    .offer-reel:nth-child(2),
-    .offer-reel:nth-child(3){ order:initial; }
+    /* phone only: MOS Amsterdam is the first video you see, GEM. second
+       (desktop keeps GEM. | MOS | Houseboat) */
+    .offer-reels > .offer-reel:nth-child(1){ order:2; }
+    .offer-reels > .offer-reel:nth-child(2){ order:1; }
+    .offer-reels > .offer-reel:nth-child(3){ order:3; }
   }
 
   /* michelin star badge: icon repeated per star instead of spelling out the count */
@@ -531,7 +686,6 @@
   .offer-list{
     display:grid; grid-template-columns:repeat(2,1fr); gap:1px;
     background:rgba(255,255,255,.14);
-    border-top:1px solid rgba(255,255,255,.14);
   }
   .offer-item{
     background:var(--black); padding:clamp(26px,3vw,43px);
@@ -548,7 +702,32 @@
   .offer-copy p{
     font-size:15px; line-height:1.6; color:var(--gray); max-width:44ch;
   }
+  /* the pay-per-video option picked out in white/black, so it reads as
+     the simpler, lower-commitment starting point next to full management */
+  .offer-item--highlight{ background:var(--white); }
+  .offer-item--highlight:hover{ background:#f0f0f0; }
+  .offer-item--highlight .offer-num{ color:rgba(0,0,0,.45); }
+  .offer-item--highlight .offer-copy h3{ color:var(--black); }
+  .offer-item--highlight .offer-copy p{ color:rgba(0,0,0,.7); }
   @media (max-width:800px){ .offer-list{ grid-template-columns:1fr; } }
+
+  .pricing-footer{
+    display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+    margin-top:clamp(28px, 3.5vw, 40px);
+  }
+  .pricing-footer .plan-notice{ margin-top:0; }
+  .pricing-footer .plan-cta{ margin-top:0; }
+  /* this is now the section's only content (the pricing cards above it
+     were removed), so it needs its own top/bottom breathing room rather
+     than relying on a section-head that's no longer there */
+  .pricing-footer--standalone{
+    margin-top:0;
+    padding:var(--section-gap) 0;
+  }
+  @media (max-width:560px){
+    .pricing-footer{ flex-direction:column; align-items:stretch; }
+    .pricing-footer .plan-notice{ white-space:normal; }
+  }
 
   /* ============================= SHOWCASE GRIDS ============================= */
   .video-grid{
@@ -681,8 +860,6 @@
   }
 
   /* ============================= PRICING ============================= */
-  #pricing.edge{ padding-top:clamp(14px, 2vw, 24px); }
-  #pricing .section-head--divided{ padding-bottom:clamp(16px, 2.2vw, 24px); }
   .pricing-tabs{
     display:flex; gap:8px; flex-wrap:nowrap;
     max-width:760px; margin:0 auto clamp(14px, 1.8vw, 20px);
