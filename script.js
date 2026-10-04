@@ -250,19 +250,17 @@
   // 1) immediate attempt
   tryPlayAll();
 
-  // 1b) safety-net retry loop for the first few seconds, in case autoplay
-  //     was blocked before the video finished decoding
+  // 1b) safety-net retry loop. It used to give up after ~4 seconds, which
+  //     is not long enough on a slow phone connection (video data can take
+  //     longer than that to arrive), so it now keeps trying every half
+  //     second for 30 seconds. It only ever calls play() on videos that are
+  //     on screen and paused, so it costs nothing once they are running.
   var playRetries = 0;
   var playRetryTimer = setInterval(function(){
     playRetries++;
-    var stillPaused = false;
-    reelVideos.forEach(function(video){ if(video.paused && onScreen(video)) stillPaused = true; });
-    if(!stillPaused || playRetries > 10){
-      clearInterval(playRetryTimer);
-      return;
-    }
     tryPlayAll();
-  }, 400);
+    if(playRetries > 60) clearInterval(playRetryTimer);
+  }, 500);
 
   // 2) attempt again at each readiness milestone (some browsers fire one
   //    but not another depending on how the data URI decodes)
@@ -270,7 +268,7 @@
     ['loadedmetadata','loadeddata','canplay','canplaythrough'].forEach(function(ev){
       video.addEventListener(ev, function(){
         if(video.paused && onScreen(video)){ video.play().catch(function(){}); }
-      }, { once: true });
+      });
     });
   });
 
@@ -293,16 +291,31 @@
     reelVideos.forEach(function(video){ vio.observe(video); });
   }
 
-  // 4) kick everything alive on first user gesture anywhere in the doc
-  function firstGesture(){
+  // 4) kick everything alive on user gestures. The old version tried ONCE,
+  //    on the first event of any kind (usually the touch that starts a
+  //    scroll, which iPhones do not count as a real tap), removed all its
+  //    listeners, and never tried again. Now: scroll/touchstart still give
+  //    one early attempt, but real taps, clicks and key presses keep
+  //    retrying for the life of the page.
+  function firstScroll(){
     tryPlayAll();
-    ['click','touchstart','scroll','keydown','pointerdown'].forEach(function(ev){
-      window.removeEventListener(ev, firstGesture, true);
+    ['scroll','touchstart'].forEach(function(ev){
+      window.removeEventListener(ev, firstScroll, true);
     });
   }
-  ['click','touchstart','scroll','keydown','pointerdown'].forEach(function(ev){
-    window.addEventListener(ev, firstGesture, { capture: true, passive: true });
+  ['scroll','touchstart'].forEach(function(ev){
+    window.addEventListener(ev, firstScroll, { capture: true, passive: true });
   });
+  ['touchend','click','pointerup','keydown'].forEach(function(ev){
+    window.addEventListener(ev, tryPlayAll, { capture: true, passive: true });
+  });
+
+  // 4b) coming back to the tab / the page being restored from the
+  //     back-forward cache: browsers pause videos meanwhile, restart them
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) tryPlayAll();
+  });
+  window.addEventListener('pageshow', tryPlayAll);
 
   // 5) tap the video to play if all else failed
   reelVideos.forEach(function(video){
