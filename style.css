@@ -238,7 +238,7 @@
   #about .section-title{ max-width:none; }
   .team-grid{
     display:grid; grid-template-columns:1fr 1fr; gap:clamp(14px, 1.6vw, 24px);
-    align-items:start;
+    align-items:stretch;
     padding-top:clamp(26px, 3vw, 40px);
     border-top:1px solid rgba(255,255,255,.14);
   }
@@ -289,10 +289,11 @@
   .bio-fact--title dd{ font-size:clamp(16px, 1.35vw, 19px); line-height:1.4; }
   .bio-fact dd em{ font-style:italic; }
   .team-bio-wrap.is-open .team-bio{ display:block; }
-  /* desktop: once a card is open its text column is taller than the photo,
-     so line the photo up with the top of it ("Meet ..." row) */
+  /* desktop: cards in a row are the same height; an open card lines its
+     photo and its "Meet ..." row up at the top instead of centring them,
+     so both headings sit on the same line even when one text is longer */
   @media (min-width:801px){
-    .team-member:has(.team-bio-wrap.is-open) .hero-photo{ align-self:flex-start; }
+    .team-member:has(.team-bio-wrap.is-open){ align-items:flex-start; }
   }
 
   @media (max-width:800px){
